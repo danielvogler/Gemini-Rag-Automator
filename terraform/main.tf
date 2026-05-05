@@ -102,6 +102,18 @@ resource "google_project_iam_member" "gcs_pubsub_publishing" {
   depends_on = [time_sleep.wait_for_apis]
 }
 
+resource "google_project_service_identity" "eventarc_agent" {
+  provider = google-beta
+  project  = var.project_id
+  service  = "eventarc.googleapis.com"
+}
+
+resource "google_project_iam_member" "eventarc_storage_viewer" {
+  project = var.project_id
+  role    = "roles/storage.viewer"
+  member  = "serviceAccount:${google_project_service_identity.eventarc_agent.email}"
+}
+
 resource "google_cloudfunctions2_function" "ingestor" {
   name        = var.function_name
   location    = var.region
@@ -149,6 +161,7 @@ resource "google_cloudfunctions2_function" "ingestor" {
     google_project_iam_member.secret_accessor,
     google_project_iam_member.aiplatform_user,
     google_project_iam_member.gcs_pubsub_publishing,
+    google_project_iam_member.eventarc_storage_viewer,
     time_sleep.wait_for_apis
   ]
 }

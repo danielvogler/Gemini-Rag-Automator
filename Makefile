@@ -3,7 +3,7 @@
 include .env
 export $(shell sed 's/=.*//' .env)
 
-UV_BIN ?= /Library/Frameworks/Python.framework/Versions/3.10/bin/uv
+UV_BIN ?= $(shell which uv)
 
 all: init tf-plan
 
