@@ -29,6 +29,9 @@ def main() -> None:
     try:
         corpus = rag.create_corpus(display_name=display_name, description=description)
         corpus_id = corpus.name
+        if not corpus_id:
+            logger.error("Created RAG Corpus but ID (name) is missing.")
+            return
         logger.info(f"Successfully created RAG Corpus: {corpus_id}")
     except Exception as e:
         logger.error(f"Failed to create RAG Corpus: {e}")
