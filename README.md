@@ -81,5 +81,4 @@ Run these commands using `make`:
 - `src/ingestor/`: Application code for the Cloud Function.
 - `scripts/`: Helper scripts, such as RAG Corpus initialization.
 - `src/adk/`: Embedded ADK CLI wrapper for local testing.
-- `agent_meta/`: Engineering context and decisions.
 - `logs/`: Output logs of local executions and tests.

@@ -3,7 +3,8 @@
 include .env
 export $(shell sed 's/=.*//' .env)
 
-UV_BIN ?= /Library/Frameworks/Python.framework/Versions/3.10/bin/uv
+# Try to find uv in PATH, fallback to common install locations
+UV_BIN ?= $(shell command -v uv 2>/dev/null || command -v ~/.local/bin/uv 2>/dev/null || command -v ~/.cargo/bin/uv 2>/dev/null || echo uv)
 
 all: init tf-plan
 
