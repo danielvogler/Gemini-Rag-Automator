@@ -41,6 +41,14 @@ resource "google_storage_bucket" "function_source" {
   force_destroy               = true
 }
 
+resource "google_storage_bucket" "agent_engine_staging" {
+  name                        = lower(var.agent_engine_staging_bucket_name)
+  location                    = var.agent_engine_region
+  uniform_bucket_level_access = true
+  force_destroy               = true
+  depends_on                  = [time_sleep.wait_for_apis]
+}
+
 data "archive_file" "function_zip" {
   type        = "zip"
   source_dir  = "${path.module}/../src/ingestor"

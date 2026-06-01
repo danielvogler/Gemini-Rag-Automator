@@ -1,4 +1,13 @@
-"""Script to query the Gemini RAG Pipeline."""
+"""Script to query the Gemini RAG Pipeline.
+
+LEGACY — kept for reference and debugging only.
+
+This uses ``Tool.from_retrieval(rag.Retrieval(...))`` (server-side grounding),
+which on Gemini 2.5/3 blends parametric knowledge with retrieved chunks. For
+corpus-only answers with citations, use the ADK agent at ``src/agent/`` and
+the helpers ``scripts/deploy_agent.py`` + ``scripts/query_agent.py``
+(``make agent-deploy`` / ``make agent-query Q="..."``).
+"""
 
 import os
 import logging

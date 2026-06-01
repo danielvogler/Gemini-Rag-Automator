@@ -1,13 +1,13 @@
 from unittest.mock import MagicMock
 
 from cloudevents.http import CloudEvent
-from src.ingestor.main import get_corpus_id, process_file
+from ingestor.main import get_corpus_id, process_file
 
 
 def test_get_corpus_id(mocker):
     # Mock the SecretManagerServiceClient
     mock_client_class = mocker.patch(
-        "src.ingestor.main.secretmanager.SecretManagerServiceClient"
+        "ingestor.main.secretmanager.SecretManagerServiceClient"
     )
     mock_client_instance = mock_client_class.return_value
 
@@ -17,8 +17,8 @@ def test_get_corpus_id(mocker):
     mock_client_instance.access_secret_version.return_value = mock_response
 
     # Mock environment variables
-    mocker.patch("src.ingestor.main.project_id", "test-project")
-    mocker.patch("src.ingestor.main.secret_id", "test-secret")
+    mocker.patch("ingestor.main.project_id", "test-project")
+    mocker.patch("ingestor.main.secret_id", "test-secret")
 
     corpus_id = get_corpus_id()
 
@@ -29,8 +29,8 @@ def test_get_corpus_id(mocker):
 
 
 def test_process_file_ignores_non_pdf(mocker):
-    mock_get_corpus = mocker.patch("src.ingestor.main.get_corpus_id")
-    mock_import = mocker.patch("src.ingestor.main.rag.import_files")
+    mock_get_corpus = mocker.patch("ingestor.main.get_corpus_id")
+    mock_import = mocker.patch("ingestor.main.rag.import_files")
 
     attributes = {"type": "google.cloud.storage.object.v1.finalized", "source": "test"}
     data = {"bucket": "test-bucket", "name": "test_document.txt"}
@@ -43,8 +43,8 @@ def test_process_file_ignores_non_pdf(mocker):
 
 
 def test_process_file_missing_data(mocker):
-    mock_get_corpus = mocker.patch("src.ingestor.main.get_corpus_id")
-    mock_import = mocker.patch("src.ingestor.main.rag.import_files")
+    mock_get_corpus = mocker.patch("ingestor.main.get_corpus_id")
+    mock_import = mocker.patch("ingestor.main.rag.import_files")
 
     attributes = {"type": "google.cloud.storage.object.v1.finalized", "source": "test"}
     data = {"bucket": "test-bucket"}  # Missing name
@@ -57,21 +57,19 @@ def test_process_file_missing_data(mocker):
 
 
 def test_process_file_success(mocker):
-    mock_get_corpus = mocker.patch("src.ingestor.main.get_corpus_id")
+    mock_get_corpus = mocker.patch("ingestor.main.get_corpus_id")
     mock_get_corpus.return_value = "mock_corpus_123"
 
-    mock_vertexai_init = mocker.patch("src.ingestor.main.vertexai.init")
-    mock_import_files = mocker.patch("src.ingestor.main.rag.import_files")
+    mock_vertexai_init = mocker.patch("ingestor.main.vertexai.init")
+    mock_import_files = mocker.patch("ingestor.main.rag.import_files")
     mock_response = MagicMock()
     mock_response.imported_rag_files_count = 1
     mock_import_files.return_value = mock_response
 
-    mock_llm_parser = mocker.patch("src.ingestor.main.rag.LlmParserConfig", create=True)
-    mock_chunking_config = mocker.patch(
-        "src.ingestor.main.rag.ChunkingConfig", create=True
-    )
+    mock_llm_parser = mocker.patch("ingestor.main.rag.LlmParserConfig", create=True)
+    mock_chunking_config = mocker.patch("ingestor.main.rag.ChunkingConfig", create=True)
     mock_transformation_config = mocker.patch(
-        "src.ingestor.main.rag.TransformationConfig", create=True
+        "ingestor.main.rag.TransformationConfig", create=True
     )
 
     # Setup event
@@ -79,8 +77,8 @@ def test_process_file_success(mocker):
     data = {"bucket": "test-bucket", "name": "test_document.pdf"}
     event = CloudEvent(attributes, data)
 
-    mocker.patch("src.ingestor.main.project_id", "test-project")
-    mocker.patch("src.ingestor.main.location", "us-central1")
+    mocker.patch("ingestor.main.project_id", "test-project")
+    mocker.patch("ingestor.main.location", "us-central1")
 
     process_file(event)
 
@@ -107,9 +105,9 @@ def test_process_file_success(mocker):
 
 
 def test_process_file_get_corpus_id_fails(mocker):
-    mock_get_corpus = mocker.patch("src.ingestor.main.get_corpus_id")
+    mock_get_corpus = mocker.patch("ingestor.main.get_corpus_id")
     mock_get_corpus.side_effect = Exception("Secret Manager Error")
-    mock_import = mocker.patch("src.ingestor.main.rag.import_files")
+    mock_import = mocker.patch("ingestor.main.rag.import_files")
 
     attributes = {"type": "google.cloud.storage.object.v1.finalized", "source": "test"}
     data = {"bucket": "test-bucket", "name": "test_document.pdf"}
@@ -126,20 +124,20 @@ def test_process_file_get_corpus_id_fails(mocker):
 
 
 def test_process_file_import_fails(mocker):
-    mock_get_corpus = mocker.patch("src.ingestor.main.get_corpus_id")
+    mock_get_corpus = mocker.patch("ingestor.main.get_corpus_id")
     mock_get_corpus.return_value = "mock_corpus_123"
 
-    mocker.patch("src.ingestor.main.vertexai.init")
+    mocker.patch("ingestor.main.vertexai.init")
 
-    mock_import_files = mocker.patch("src.ingestor.main.rag.import_files")
+    mock_import_files = mocker.patch("ingestor.main.rag.import_files")
     mock_import_files.side_effect = Exception("Import Error")
 
     attributes = {"type": "google.cloud.storage.object.v1.finalized", "source": "test"}
     data = {"bucket": "test-bucket", "name": "test_document.pdf"}
     event = CloudEvent(attributes, data)
 
-    mocker.patch("src.ingestor.main.project_id", "test-project")
-    mocker.patch("src.ingestor.main.location", "us-central1")
+    mocker.patch("ingestor.main.project_id", "test-project")
+    mocker.patch("ingestor.main.location", "us-central1")
 
     import pytest
 

@@ -224,6 +224,10 @@ __marimo__/
 # Custom Ignores
 *.zip
 agent_meta/*
+.agent/
+.sisyphus/
+.DS_Store
+**/.DS_Store
 
 # Terraform
 **/.terraform/*
