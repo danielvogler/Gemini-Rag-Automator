@@ -99,6 +99,21 @@ def _cited_indices(answer: str) -> set[int]:
     return {int(m) for m in _CITATION_PATTERN.findall(answer)}
 
 
+def _citation_label(c: dict) -> str:
+    """Prefer extracted paper metadata (title/authors/journal); fall back to filename."""
+    title = c.get("title")
+    if title:
+        label = title
+        authors = c.get("authors") or []
+        if authors:
+            label += f" — {', '.join(authors)}"
+        journal = c.get("journal")
+        if journal:
+            label += f" ({journal})"
+        return label
+    return c.get("source_display_name") or c.get("source_uri") or "(unknown)"
+
+
 def _render_plain(answer: str, chunks: list[dict]) -> str:
     if not chunks:
         return answer
@@ -109,7 +124,7 @@ def _render_plain(answer: str, chunks: list[dict]) -> str:
     lines = [answer, "", _EXCERPTS_HEADER]
     for c in shown:
         idx = c.get("index")
-        title = c.get("source_display_name") or c.get("source_uri") or "(unknown)"
+        label = _citation_label(c)
         uri = c.get("source_uri") or ""
         score = c.get("score")
         score_str = (
@@ -119,8 +134,8 @@ def _render_plain(answer: str, chunks: list[dict]) -> str:
         if len(text) > _EXCERPT_MAX_CHARS:
             text = text[:_EXCERPT_MAX_CHARS].rstrip() + "..."
         lines.append("")
-        lines.append(f"[{idx}] {title}{score_str}")
-        if uri and uri != title:
+        lines.append(f"[{idx}] {label}{score_str}")
+        if uri and uri != label:
             lines.append(f"    {uri}")
         if text:
             quoted = "\n".join(f"    > {ln}" for ln in text.split("\n") if ln)
@@ -137,6 +152,9 @@ def _render_structured(answer: str, chunks: list[dict]) -> str:
                     "index": c.get("index"),
                     "source_uri": c.get("source_uri"),
                     "source_display_name": c.get("source_display_name"),
+                    "title": c.get("title"),
+                    "authors": c.get("authors"),
+                    "journal": c.get("journal"),
                     "score": c.get("score"),
                     "text": c.get("text"),
                 }

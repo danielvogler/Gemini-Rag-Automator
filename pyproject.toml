@@ -9,7 +9,9 @@ dependencies = [
     "functions-framework>=3.10.1",
     "google-adk>=1.31.0",
     "google-cloud-aiplatform[adk,agent-engines]>=1.135.0",
+    "google-cloud-firestore>=2.20.0",
     "google-cloud-secret-manager>=2.26.0",
+    "pypdf>=5.0.0",
     "python-dotenv>=1.0.0",
     "ruff>=0.15.12",
 ]

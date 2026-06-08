@@ -31,7 +31,8 @@ TF_VARS = -var="project_id=$${GOOGLE_CLOUD_PROJECT}" \
           -var="function_name=$${CLOUD_FUNCTION_NAME}" \
           -var="gemini_model_name=$${GEMINI_MODEL_NAME}" \
           -var="agent_engine_region=$${AGENT_ENGINE_LOCATION}" \
-          -var="agent_engine_staging_bucket_name=$${AGENT_STAGING_BUCKET_NAME}"
+          -var="agent_engine_staging_bucket_name=$${AGENT_STAGING_BUCKET_NAME}" \
+          -var="firestore_location=$${FIRESTORE_LOCATION}"
 
 tf-plan:
 	@echo "Planning terraform..."
