@@ -1,8 +1,52 @@
 """Function tool that queries the configured Vertex AI RAG corpus."""
 
+import hashlib
+import logging
 import os
+from typing import cast
 
+from google.cloud import firestore
+from google.cloud.firestore import DocumentSnapshot
 from vertexai.preview import rag
+
+logger = logging.getLogger(__name__)
+
+# Must match PAPER_METADATA_COLLECTION / gcs_uri_to_doc_id in src/ingestor/main.py —
+# that's where title/authors/journal get extracted and stored at ingestion time.
+_PAPER_METADATA_COLLECTION = "paper_metadata"
+
+
+def _gcs_uri_to_doc_id(gcs_uri: str) -> str:
+    return hashlib.sha256(gcs_uri.encode("utf-8")).hexdigest()
+
+
+def _lookup_paper_metadata(gcs_uri: str) -> dict | None:
+    """Look up extracted title/authors/journal for a source document, if any."""
+    if not gcs_uri:
+        return None
+    try:
+        client = firestore.Client()
+        # firestore.Client is synchronous; .get() always returns a DocumentSnapshot
+        # here (the Awaitable branch in its type signature applies to AsyncClient).
+        doc = cast(
+            DocumentSnapshot,
+            client.collection(_PAPER_METADATA_COLLECTION)
+            .document(_gcs_uri_to_doc_id(gcs_uri))
+            .get(),
+        )
+    except Exception as e:
+        logger.warning(f"Paper metadata lookup failed for {gcs_uri}: {e}")
+        return None
+
+    if not doc.exists:
+        return None
+
+    data = doc.to_dict() or {}
+    return {
+        "title": data.get("title"),
+        "authors": data.get("authors") or [],
+        "journal": data.get("journal"),
+    }
 
 
 def retrieve_rag_documentation(query: str) -> dict:
@@ -19,7 +63,9 @@ def retrieve_rag_documentation(query: str) -> dict:
           - {"chunks": [...]}        when the corpus has matching content
           - {"chunks": [], "empty": True}  when nothing matches
         Each chunk has: index (int, 1-based), text (str), source_uri (str),
-        source_display_name (str), score (float).
+        source_display_name (str), score (float), and — when available from
+        the paper-metadata lookup — title (str), authors (list[str]),
+        journal (str).
     """
     rag_corpus = os.environ.get("RAG_CORPUS")
     if not rag_corpus:
@@ -40,15 +86,24 @@ def retrieve_rag_documentation(query: str) -> dict:
     if not contexts:
         return {"chunks": [], "empty": True}
 
-    return {
-        "chunks": [
-            {
-                "index": i + 1,
-                "text": c.text,
-                "source_uri": c.source_uri,
-                "source_display_name": c.source_display_name,
-                "score": c.score,
-            }
-            for i, c in enumerate(contexts)
-        ]
-    }
+    paper_metadata_cache: dict[str, dict | None] = {}
+    chunks = []
+    for i, c in enumerate(contexts):
+        if c.source_uri not in paper_metadata_cache:
+            paper_metadata_cache[c.source_uri] = _lookup_paper_metadata(c.source_uri)
+        paper = paper_metadata_cache[c.source_uri]
+
+        chunk = {
+            "index": i + 1,
+            "text": c.text,
+            "source_uri": c.source_uri,
+            "source_display_name": c.source_display_name,
+            "score": c.score,
+        }
+        if paper:
+            chunk["title"] = paper["title"]
+            chunk["authors"] = paper["authors"]
+            chunk["journal"] = paper["journal"]
+        chunks.append(chunk)
+
+    return {"chunks": chunks}

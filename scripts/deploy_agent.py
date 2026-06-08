@@ -132,6 +132,7 @@ def main() -> None:
     requirements = [
         "google-adk>=1.31.0",
         "google-cloud-aiplatform[adk,agent-engines]>=1.135.0",
+        "google-cloud-firestore>=2.20.0",
         "python-dotenv>=1.0.0",
     ]
 

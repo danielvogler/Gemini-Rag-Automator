@@ -8,7 +8,8 @@ locals {
     "storage.googleapis.com",
     "aiplatform.googleapis.com",
     "artifactregistry.googleapis.com",
-    "pubsub.googleapis.com"
+    "pubsub.googleapis.com",
+    "firestore.googleapis.com"
   ])
 }
 
@@ -90,6 +91,23 @@ resource "google_project_iam_member" "aiplatform_user" {
   member  = "serviceAccount:${google_service_account.rag_ingestor_sa.email}"
 }
 
+# Stores extracted paper metadata (title/authors/journal), keyed by a hash of
+# the GCS URI. Written by the ingestor at ingest time, read by the agent at
+# query time to enrich citations — both run as rag_ingestor_sa.
+resource "google_firestore_database" "paper_metadata" {
+  project     = var.project_id
+  name        = "(default)"
+  location_id = var.firestore_location
+  type        = "FIRESTORE_NATIVE"
+  depends_on  = [time_sleep.wait_for_apis]
+}
+
+resource "google_project_iam_member" "firestore_user" {
+  project = var.project_id
+  role    = "roles/datastore.user"
+  member  = "serviceAccount:${google_service_account.rag_ingestor_sa.email}"
+}
+
 resource "google_secret_manager_secret" "rag_corpus_id" {
   secret_id = var.secret_id
   replication {
@@ -157,6 +175,8 @@ resource "google_cloudfunctions2_function" "ingestor" {
     google_project_iam_member.secret_accessor,
     google_project_iam_member.aiplatform_user,
     google_project_iam_member.gcs_pubsub_publishing,
+    google_project_iam_member.firestore_user,
+    google_firestore_database.paper_metadata,
     time_sleep.wait_for_apis
   ]
 }
