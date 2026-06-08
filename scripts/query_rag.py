@@ -1,4 +1,13 @@
-"""Script to query the Gemini RAG Pipeline."""
+"""Script to query the Gemini RAG Pipeline.
+
+LEGACY — kept for reference and debugging only.
+
+This uses ``Tool.from_retrieval(rag.Retrieval(...))`` (server-side grounding),
+which on Gemini 2.5/3 blends parametric knowledge with retrieved chunks. For
+corpus-only answers with citations, use the ADK agent at ``src/agent/`` and
+the helpers ``scripts/deploy_agent.py`` + ``scripts/query_agent.py``
+(``make agent-deploy`` / ``make agent-query Q="..."``).
+"""
 
 import os
 import logging
@@ -70,10 +79,27 @@ def main():
     )
 
     # Generate the grounded response
-    response = model.generate_content(args.query)
+    generation_response = model.generate_content(args.query)
 
     logger.info("ANSWER:")
-    logger.info(response.text)
+    logger.info(generation_response.text)
+
+    # Surface the retrieved corpus chunks that grounded the answer, alongside
+    # their source document, so the citation can show *which text segment*
+    # backed the response (not just which PDF it came from).
+    candidates = generation_response.candidates
+    if candidates:
+        grounding_metadata = candidates[0].grounding_metadata
+        grounding_chunks = (
+            grounding_metadata.grounding_chunks if grounding_metadata else []
+        )
+        if grounding_chunks:
+            logger.info("\nSOURCE CHUNKS:")
+            for i, chunk in enumerate(grounding_chunks, start=1):
+                retrieved_context = chunk.retrieved_context
+                title = retrieved_context.title or retrieved_context.uri
+                logger.info(f"\n[{i}] {title}")
+                logger.info(retrieved_context.text)
 
 
 if __name__ == "__main__":
