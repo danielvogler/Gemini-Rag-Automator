@@ -127,6 +127,7 @@ def main() -> None:
         "AGENT_TOP_K": os.environ.get("AGENT_TOP_K", "10"),
         "AGENT_DISTANCE_THRESHOLD": os.environ.get("AGENT_DISTANCE_THRESHOLD", "0.6"),
         "AGENT_STRUCTURED_OUTPUT": os.environ.get("AGENT_STRUCTURED_OUTPUT", "0"),
+        "AGENT_EXCERPT_MAX_CHARS": os.environ.get("AGENT_EXCERPT_MAX_CHARS", "600"),
     }
 
     requirements = [

@@ -11,7 +11,10 @@ actually happens, so conversational turns pass through untouched.
 * ``validate_answer_after_model`` (after_model_callback) - runs ONLY when a
   retrieval call happened this turn. If the model's text answer is not
   supported by the retrieved chunks, rewrite it to the literal abstain
-  string. Conversational answers (no retrieval) pass through.
+  string. Otherwise it appends the retrieved source excerpts to the answer
+  (see ``rendering.py``) so they are part of the agent's own output.
+  Conversational answers (no retrieval) pass through. Note: abstain answers
+  get NO excerpts, which keeps out-of-corpus replies clean.
 
 ``temp:`` prefixed state keys are reset per invocation by ADK so turn N's
 answer can't be validated against turn N-1's chunks.
@@ -27,6 +30,7 @@ from google.adk.tools.tool_context import ToolContext
 from google.genai import types
 
 from .prompts import ABSTAIN_MESSAGE
+from .rendering import render_answer
 
 
 _TOOL_NAME = "retrieve_rag_documentation"
@@ -110,16 +114,26 @@ def validate_answer_after_model(
         return _abstain_response()
 
     chunks = state.get(_STATE_CITATIONS) or []
-    if _answer_supported_by_chunks(text, chunks):
-        return None
+    if not _answer_supported_by_chunks(text, chunks):
+        return _abstain_response()
 
-    return _abstain_response()
+    # Grounded, supported answer: emit the retrieved source excerpts as part of
+    # the agent's own response so they show up in any consumer (CLI *and* the
+    # Agent Engine Playground UI, which only renders the agent's final message).
+    rendered = render_answer(text, chunks)
+    if rendered == text:
+        return None
+    return _text_response(rendered)
 
 
 def _abstain_response() -> LlmResponse:
+    return _text_response(ABSTAIN_MESSAGE)
+
+
+def _text_response(text: str) -> LlmResponse:
     return LlmResponse(
         content=types.Content(
             role="model",
-            parts=[types.Part(text=ABSTAIN_MESSAGE)],
+            parts=[types.Part(text=text)],
         )
     )
