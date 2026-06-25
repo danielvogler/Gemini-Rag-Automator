@@ -19,12 +19,20 @@ to 0 to disable truncation).
 
 import json
 import os
+import re
 
 _DEFAULT_EXCERPT_MAX_CHARS = 600
 
 # Marker used to separate the model's answer from the appended excerpts. The CLI
 # relies on this to recover the clean answer when building structured output.
 EXCERPTS_HEADER = "Source excerpts:"
+
+_CITATION_PATTERN = re.compile(r"\[(\d+)\]")
+
+
+def cited_indices(answer: str) -> set[int]:
+    """1-based chunk indices the answer actually cites via ``[n]`` markers."""
+    return {int(m) for m in _CITATION_PATTERN.findall(answer)}
 
 
 def excerpt_max_chars() -> int:
@@ -68,18 +76,30 @@ def citation_label(chunk: dict) -> str:
 
 
 def render_plain(answer: str, chunks: list[dict]) -> str:
-    """Append a ``Source excerpts:`` section to ``answer`` for the given chunks."""
+    """Append a ``Source excerpts:`` section to ``answer`` for the given chunks.
+
+    Only the chunks the answer actually cites (via ``[n]``) are shown, so the
+    excerpts match the citations rather than dumping every retrieved chunk. If
+    the answer has no ``[n]`` citations, all chunks are shown as a fallback.
+    """
     if not chunks:
         return answer
 
+    cited = cited_indices(answer)
+    shown = [c for c in chunks if c.get("index") in cited] if cited else chunks
+    if not shown:
+        shown = chunks
+
     max_chars = excerpt_max_chars()
     lines = [answer, "", EXCERPTS_HEADER]
-    for c in chunks:
+    for c in shown:
         idx = c.get("index")
         label = citation_label(c)
         uri = c.get("source_uri") or ""
         score = c.get("score")
-        score_str = f" score={score:.3f}" if isinstance(score, (int, float)) else ""
+        score_str = (
+            f" vector_distance={score:.3f}" if isinstance(score, (int, float)) else ""
+        )
         text = (c.get("text") or "").strip()
         if max_chars and len(text) > max_chars:
             text = text[:max_chars].rstrip() + "..."

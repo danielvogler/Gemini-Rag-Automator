@@ -19,6 +19,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -84,6 +85,9 @@ _EXCERPT_MAX_CHARS = 600
 _EXCERPTS_HEADER = "Source excerpts:"
 
 
+_CITATION_PATTERN = re.compile(r"\[(\d+)\]")
+
+
 def _strip_excerpts(answer: str) -> str:
     """Return just the model's answer, dropping any agent-appended excerpts."""
     marker = f"\n\n{_EXCERPTS_HEADER}"
@@ -91,16 +95,26 @@ def _strip_excerpts(answer: str) -> str:
     return answer[:idx].rstrip() if idx != -1 else answer
 
 
+def _cited_indices(answer: str) -> set[int]:
+    return {int(m) for m in _CITATION_PATTERN.findall(answer)}
+
+
 def _render_plain(answer: str, chunks: list[dict]) -> str:
     if not chunks:
         return answer
+    cited = _cited_indices(answer)
+    shown = [c for c in chunks if c.get("index") in cited] if cited else chunks
+    if not shown:
+        shown = chunks
     lines = [answer, "", _EXCERPTS_HEADER]
-    for c in chunks:
+    for c in shown:
         idx = c.get("index")
         title = c.get("source_display_name") or c.get("source_uri") or "(unknown)"
         uri = c.get("source_uri") or ""
         score = c.get("score")
-        score_str = f" score={score:.3f}" if isinstance(score, (int, float)) else ""
+        score_str = (
+            f" vector_distance={score:.3f}" if isinstance(score, (int, float)) else ""
+        )
         text = (c.get("text") or "").strip()
         if len(text) > _EXCERPT_MAX_CHARS:
             text = text[:_EXCERPT_MAX_CHARS].rstrip() + "..."

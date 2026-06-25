@@ -27,8 +27,30 @@ def test_render_plain_appends_excerpts_section():
     out = render_plain("Heat from the Earth [1].", [_chunk()])
     assert out.startswith("Heat from the Earth [1].")
     assert EXCERPTS_HEADER in out
-    assert "[1] paper.pdf score=0.420" in out
+    assert "[1] paper.pdf vector_distance=0.420" in out
     assert "> Geothermal energy is heat from the Earth." in out
+
+
+def test_render_plain_shows_only_cited_chunks():
+    chunks = [
+        _chunk(index=1, source_display_name="a.pdf"),
+        _chunk(index=2, source_display_name="b.pdf"),
+        _chunk(index=3, source_display_name="c.pdf"),
+    ]
+    out = render_plain("Only the first and third [1][3].", chunks)
+    assert "[1] a.pdf" in out
+    assert "[3] c.pdf" in out
+    assert "b.pdf" not in out
+
+
+def test_render_plain_falls_back_to_all_when_no_citations():
+    chunks = [
+        _chunk(index=1, source_display_name="a.pdf"),
+        _chunk(index=2, source_display_name="b.pdf"),
+    ]
+    out = render_plain("An answer with no bracket citations.", chunks)
+    assert "a.pdf" in out
+    assert "b.pdf" in out
 
 
 def test_render_plain_without_chunks_returns_answer_unchanged():
