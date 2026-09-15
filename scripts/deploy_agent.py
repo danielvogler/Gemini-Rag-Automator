@@ -158,6 +158,7 @@ def main() -> None:
     requirements = [
         adk_pin,
         aiplatform_pin,
+        "google-cloud-firestore>=2.20.0",
         "python-dotenv>=1.0.0",
     ]
 

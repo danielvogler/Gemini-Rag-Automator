@@ -123,6 +123,9 @@ def render_structured(answer: str, chunks: list[dict]) -> str:
                     "index": c.get("index"),
                     "source_uri": c.get("source_uri"),
                     "source_display_name": c.get("source_display_name"),
+                    "title": c.get("title"),
+                    "authors": c.get("authors") or [],
+                    "journal": c.get("journal"),
                     "score": c.get("score"),
                     "text": c.get("text"),
                 }

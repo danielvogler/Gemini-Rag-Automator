@@ -116,3 +116,30 @@ def test_render_answer_plain_by_default(monkeypatch):
     monkeypatch.delenv("AGENT_STRUCTURED_OUTPUT", raising=False)
     out = render_answer("answer [1]", [_chunk()])
     assert EXCERPTS_HEADER in out
+
+
+def test_render_structured_includes_paper_metadata():
+    # Arrange
+    chunk = _chunk(
+        title="Deep Geothermal Systems",
+        authors=["A. Rossi", "B. Keller"],
+        journal="Geothermics",
+    )
+
+    # Act
+    citation = json.loads(render_structured("answer", [chunk]))["citations"][0]
+
+    # Assert
+    assert citation["title"] == "Deep Geothermal Systems"
+    assert citation["authors"] == ["A. Rossi", "B. Keller"]
+    assert citation["journal"] == "Geothermics"
+
+
+def test_render_structured_omits_paper_metadata_when_absent():
+    # Arrange / Act
+    citation = json.loads(render_structured("answer", [_chunk()]))["citations"][0]
+
+    # Assert
+    assert citation["title"] is None
+    assert citation["authors"] == []
+    assert citation["journal"] is None
