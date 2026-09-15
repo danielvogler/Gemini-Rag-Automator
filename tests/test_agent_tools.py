@@ -1,10 +1,25 @@
 from unittest.mock import MagicMock
 
+import pytest
+
 from agent.tools import (
+    _firestore_client,
     _gcs_uri_to_doc_id,
     _lookup_paper_metadata,
     retrieve_rag_documentation,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_firestore_client_cache():
+    """The Firestore client is cached per process, so drop it around every test.
+
+    Without this, the first test's patched client stays cached and later tests
+    never see their own patch.
+    """
+    _firestore_client.cache_clear()
+    yield
+    _firestore_client.cache_clear()
 
 
 def _make_context(text, source_uri, source_display_name, score):

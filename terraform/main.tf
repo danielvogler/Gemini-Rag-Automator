@@ -99,13 +99,28 @@ resource "google_firestore_database" "paper_metadata" {
   name        = "(default)"
   location_id = var.firestore_location
   type        = "FIRESTORE_NATIVE"
-  depends_on  = [time_sleep.wait_for_apis]
+  # Explicit (matches the provider default): a destroy drops this from state
+  # but leaves the database in place. A project's "(default)" database cannot
+  # be recreated in a different mode, so never let a teardown delete it.
+  deletion_policy = "ABANDON"
+  depends_on      = [time_sleep.wait_for_apis]
 }
 
 resource "google_project_iam_member" "firestore_user" {
   project = var.project_id
   role    = "roles/datastore.user"
   member  = "serviceAccount:${google_service_account.rag_ingestor_sa.email}"
+}
+
+# The ingestor re-downloads each uploaded PDF to read its first page for
+# metadata extraction. The Eventarc trigger only delivers the object's *name*,
+# not its bytes, so the function needs explicit read access to the source
+# bucket — without this the download 403s and citations silently fall back to
+# the bare filename.
+resource "google_storage_bucket_iam_member" "ingestor_source_reader" {
+  bucket = google_storage_bucket.rag_document_source.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.rag_ingestor_sa.email}"
 }
 
 resource "google_secret_manager_secret" "rag_corpus_id" {
@@ -176,6 +191,7 @@ resource "google_cloudfunctions2_function" "ingestor" {
     google_project_iam_member.aiplatform_user,
     google_project_iam_member.gcs_pubsub_publishing,
     google_project_iam_member.firestore_user,
+    google_storage_bucket_iam_member.ingestor_source_reader,
     google_firestore_database.paper_metadata,
     time_sleep.wait_for_apis
   ]

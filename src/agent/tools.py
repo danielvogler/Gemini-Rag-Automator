@@ -3,6 +3,7 @@
 import hashlib
 import logging
 import os
+from functools import lru_cache
 from typing import cast
 
 from google.cloud import firestore
@@ -20,12 +21,22 @@ def _gcs_uri_to_doc_id(gcs_uri: str) -> str:
     return hashlib.sha256(gcs_uri.encode("utf-8")).hexdigest()
 
 
+@lru_cache(maxsize=1)
+def _firestore_client() -> firestore.Client:
+    """Firestore client, built once per process.
+
+    Constructing a client re-runs credential discovery, so building one per
+    lookup would add that cost to every retrieval on the query hot path.
+    """
+    return firestore.Client()
+
+
 def _lookup_paper_metadata(gcs_uri: str) -> dict | None:
     """Look up extracted title/authors/journal for a source document, if any."""
     if not gcs_uri:
         return None
     try:
-        client = firestore.Client()
+        client = _firestore_client()
         # firestore.Client is synchronous; .get() always returns a DocumentSnapshot
         # here (the Awaitable branch in its type signature applies to AsyncClient).
         doc = cast(
