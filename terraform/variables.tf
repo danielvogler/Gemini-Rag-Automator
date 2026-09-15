@@ -42,3 +42,13 @@ variable "gemini_model_name" {
   description = "The name of the Gemini model to use"
   type        = string
 }
+
+variable "agent_engine_region" {
+  description = "GCP region for the Vertex AI Agent Engine deployment. May differ from var.region (the corpus region)."
+  type        = string
+}
+
+variable "agent_engine_staging_bucket_name" {
+  description = "GCS bucket used by Vertex AI Agent Engine for code packaging during deploy."
+  type        = string
+}
