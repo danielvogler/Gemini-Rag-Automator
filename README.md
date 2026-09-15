@@ -1,47 +1,189 @@
-# Gemini RAG Automator
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/assets/banner-dark.svg">
+  <img alt="Gemini RAG Automator — drop a PDF in a bucket and it becomes a corpus your agent can only answer from, with every claim traced back to the passage it came from." src="docs/assets/banner-light.svg">
+</picture>
 
-[![CI Build](https://github.com/danielvogler/gemini-rag-automator/actions/workflows/ci.yml/badge.svg)](https://github.com/danielvogler/gemini-rag-automator/actions)
-[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
-[![Python 3.12](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/release/python-3120/)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![Terraform](https://img.shields.io/badge/terraform-%235835CC.svg?logo=terraform&logoColor=white)](https://www.terraform.io/)
-[![Google Cloud](https://img.shields.io/badge/GoogleCloud-%234285F4.svg?logo=google-cloud&logoColor=white)](https://cloud.google.com/)
+[![CI](https://github.com/danielvogler/Gemini-Rag-Automator/actions/workflows/ci.yml/badge.svg)](https://github.com/danielvogler/Gemini-Rag-Automator/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-0E0E10.svg)](./LICENSE)
+[![Python](https://img.shields.io/badge/python-3.12%2B-0E0E10.svg)](https://www.python.org/downloads/)
+[![uv](https://img.shields.io/badge/deps-uv-0E0E10.svg)](https://docs.astral.sh/uv/)
+[![ADK](https://img.shields.io/badge/agents-Google%20ADK-0E0E10.svg)](https://adk.dev)
+[![Terraform](https://img.shields.io/badge/infra-terraform-0E0E10.svg)](https://www.terraform.io/)
+[![Ruff](https://img.shields.io/badge/lint-ruff-0E0E10.svg)](https://docs.astral.sh/ruff/)
+[![pre-commit](https://img.shields.io/badge/pre--commit-enabled-0E0E10.svg)](https://pre-commit.com/)
+
+---
+
+## Start here
+
+Clone it, then point your coding agent at **[AGENTS.md](./AGENTS.md)** and tell it
+what you want to be able to ask questions about.
+
+```
+Read AGENTS.md and set this up. I want to be able to ask questions
+about our geothermal papers and get answers with citations.
+```
+
+That file is written for exactly this. It covers the prerequisites worth
+checking before anything is provisioned, the order the pieces have to come up
+in, the one IAM grant Terraform cannot make for you, and how to tell whether
+the thing actually works once it is deployed. You do not need to know the
+project to start.
+
+The rest of this page is what the agent is working from.
+
+---
+
+## What it does
 
 This project provisions an automated ingestion pipeline using Terraform and a Gen-2 Cloud Function.
 When a new PDF is uploaded to the designated Google Cloud Storage bucket, an Eventarc trigger fires to process the PDF and import it into a Managed Vertex AI RAG Corpus with Advanced Parsing enabled.
 
+On top of that corpus sits an ADK agent whose only tool is a retrieval call
+against it. It cannot reach the model's training memory or Google Search, and
+an answer it cannot trace back to a retrieved chunk is replaced with a fixed
+abstain string rather than shipped. Papers also get their title, authors and
+journal read off page one at ingestion time, so a citation reads
+`Vogler et al. — Geothermics` rather than `a7f3.pdf`.
+
 ## Architecture
 
 ```mermaid
+%%{init: {'theme':'base','themeVariables':{
+  'fontFamily':'Google Sans, Roboto, Inter, Helvetica, Arial, sans-serif',
+  'fontSize':'14px',
+  'lineColor':'#5F6368',
+  'textColor':'#202124',
+  'clusterBkg':'#F8F9FA',
+  'clusterBorder':'#DADCE0',
+  'edgeLabelBackground':'#FFFFFF'
+}}}%%
 flowchart LR
-    subgraph Local["Local / Developer Machine"]
-        A[User CLI / Script]
-        Q[Query Script]
+    subgraph Local["Local / developer machine"]
+        A["Upload<br/>gcloud storage cp"]
+        Q["make agent-query"]
     end
 
-    subgraph GCP["Google Cloud Platform (GCP)"]
-        B[(GCS Bucket)]
-        C(Cloud Function Gen 2)
-        D[(Secret Manager)]
-        E[(Vertex AI RAG Corpus)]
-        AE(Vertex AI Agent Engine\ncorpus-only ADK agent)
-        UI[GCP Console\nAgent Engine Try UI]
+    subgraph GCP["Google Cloud"]
+        B[("GCS bucket")]
+        C["Cloud Function gen 2<br/>ingestor"]
+        D[("Secret Manager")]
+        F[("Firestore<br/>paper metadata")]
+        E[("Vertex AI RAG corpus")]
+        AE["Agent Engine<br/>corpus-only ADK agent"]
+        UI["Cloud Console<br/>Agent Engine playground"]
     end
 
-    A -->|Uploads PDF| B
-    B -->|Eventarc Trigger| C
-    C -->|Fetch CORPUS_ID| D
-    C -->|Import Document| E
-    Q -->|stream_query| AE
+    A -->|PDF| B
+    B -->|Eventarc| C
+    C -->|"fetch corpus id"| D
+    C -->|"first page to Gemini,<br/>title / authors / journal"| F
+    C -->|"import document"| E
+    Q -->|"stream_query"| AE
     UI -->|chat| AE
-    AE -->|retrieve_rag_documentation| E
+    AE -->|"retrieve_rag_documentation"| E
+    AE -->|"enrich citations"| F
+
+    classDef store fill:#E8F0FE,stroke:#4285F4,stroke-width:1.5px,color:#202124
+    classDef compute fill:#E6F4EA,stroke:#34A853,stroke-width:1.5px,color:#202124
+    classDef ai fill:#FEF7E0,stroke:#F9AB00,stroke-width:1.5px,color:#202124
+    classDef secret fill:#FCE8E6,stroke:#EA4335,stroke-width:1.5px,color:#202124
+    classDef local fill:#F1F3F4,stroke:#9AA0A6,stroke-width:1.5px,color:#202124
+
+    class A,Q,UI local
+    class B,F store
+    class C compute
+    class D secret
+    class E,AE ai
+```
+
+### What happens when a PDF lands
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{
+  'fontFamily':'Google Sans, Roboto, Inter, Helvetica, Arial, sans-serif',
+  'fontSize':'14px',
+  'lineColor':'#5F6368',
+  'textColor':'#202124',
+  'signalColor':'#5F6368',
+  'signalTextColor':'#202124',
+  'actorBkg':'#E8F0FE',
+  'actorBorder':'#4285F4',
+  'actorTextColor':'#202124',
+  'labelBoxBkg':'#F8F9FA',
+  'labelBoxBorderColor':'#DADCE0',
+  'noteBkgColor':'#FEF7E0',
+  'noteBorderColor':'#F9AB00',
+  'noteTextColor':'#202124'
+}}}%%
+sequenceDiagram
+    autonumber
+    participant B as GCS bucket
+    participant C as Ingestor function
+    participant G as Gemini
+    participant F as Firestore
+    participant E as RAG corpus
+
+    B->>C: Eventarc: object finalized
+    C->>B: download first page
+    C->>G: extract title / authors / journal
+    G-->>C: JSON metadata
+    C->>F: store, keyed by SHA-256 of the GCS URI
+    Note over C,F: Best effort. A failure here is logged<br/>and never blocks the import below.
+    C->>E: import_files with advanced parsing
+    E-->>C: chunks indexed
+```
+
+### What happens when someone asks a question
+
+```mermaid
+%%{init: {'theme':'base','themeVariables':{
+  'fontFamily':'Google Sans, Roboto, Inter, Helvetica, Arial, sans-serif',
+  'fontSize':'14px',
+  'lineColor':'#5F6368',
+  'textColor':'#202124',
+  'signalColor':'#5F6368',
+  'signalTextColor':'#202124',
+  'actorBkg':'#E8F0FE',
+  'actorBorder':'#4285F4',
+  'actorTextColor':'#202124',
+  'labelBoxBkg':'#F8F9FA',
+  'labelBoxBorderColor':'#DADCE0',
+  'noteBkgColor':'#FCE8E6',
+  'noteBorderColor':'#EA4335',
+  'noteTextColor':'#202124'
+}}}%%
+sequenceDiagram
+    autonumber
+    actor U as User
+    participant AG as ADK agent
+    participant T as retrieve_rag_documentation
+    participant E as RAG corpus
+    participant F as Firestore
+    participant V as after_model_callback
+
+    U->>AG: question
+    AG->>T: the only tool it has
+    T->>E: retrieval_query
+    E-->>T: top-k chunks with text, uri, distance
+    T->>F: look up paper metadata per source
+    F-->>T: title / authors / journal
+    T-->>AG: chunks
+    AG->>V: drafted answer with [n] citations
+    alt every claim is supported by a chunk
+        V-->>U: answer + Source excerpts
+    else anything is unsupported
+        V-->>U: I cannot answer that from the available corpus.
+    end
+    Note over V: The validator runs only when retrieval<br/>happened, so chitchat passes through.
 ```
 
 ## Setup & Pre-requisites
-1. Copy `.env.example` to `.env` and fill in the target variables.
+1. Copy `.env.example` to `.env` and fill in the target variables. `FIRESTORE_LOCATION` is required — `terraform apply` fails without it.
 2. Ensure you have the `uv` toolchain installed for Python dependency management.
 3. Authenticate with Google Cloud (`gcloud auth application-default login`).
 4. Install Terraform.
+5. Check whether the project already has a Firestore `(default)` database (`gcloud firestore databases list --project $GOOGLE_CLOUD_PROJECT`). Terraform creates one, and a project can only ever have one — in a mode that cannot be changed afterwards.
 
 ## Typical Workflow
 
@@ -73,6 +215,22 @@ The agent at `src/agent/` removes that ambiguity. It exposes a single client-sid
 | Factual question answered by corpus | Model retrieves, answers with inline `[n]` citations + Source excerpts |
 | Factual question NOT answered by corpus | Model returns exactly `I cannot answer that from the available corpus.` |
 | Any unsupported factual claim slipping past the model | `after_model_callback` rewrites to the abstain string |
+
+### Citations
+
+Every answer that used retrieval is followed by a `Source excerpts:` section
+listing only the chunks the answer actually cited, each with the passage text
+it was grounded in. The agent renders that itself rather than leaving it to the
+caller, so it shows up identically in the Cloud Console playground and in
+`make agent-query`.
+
+Where paper metadata was extracted at ingestion, a citation is labelled
+`Title — Authors (Journal)`; otherwise it falls back to the filename. The
+lookup is keyed by a SHA-256 hash of the chunk's GCS URI, because Firestore
+document IDs cannot contain `/`.
+
+`vector_distance=` on each excerpt is the retrieval distance — **lower is
+closer**. It is not a similarity score.
 
 ### Customer access paths
 
@@ -165,4 +323,5 @@ Run these commands using `make`:
 - `src/agent/` : Google ADK corpus-only agent deployed to Vertex AI Agent Engine. Function-tool RAG retrieval, forced tool use, post-hoc answer validation, hard abstain on no-result.
 - `scripts/` : Helper scripts — RAG corpus init, file listing, agent deploy, agent query, legacy query.
 - `tests/` : pytest suite.
+- `docs/assets/` : README banner (light and dark).
 - `logs/` : Output logs of local executions and tests.

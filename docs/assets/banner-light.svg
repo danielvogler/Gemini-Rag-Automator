@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="300" viewBox="0 0 1200 300" role="img" aria-label="Gemini RAG Automator — drop a PDF in a bucket and it becomes a corpus your agent can only answer from, with every claim traced back to the passage it came from.">
+  <title>Gemini RAG Automator</title>
+  <!-- The mark is a single page with one passage lit and framed. That is the
+       whole argument of this project: an answer is not a summary of what the
+       model knows, it is a pointer at the paragraph it came from. Everything
+       else here - the forced tool call, the validator, the abstain string -
+       exists to keep that frame honest. -->
+  <rect width="1200" height="300" fill="#FFFFFF"/>
+
+  <g transform="translate(76 80)">
+    <rect width="140" height="140" rx="18" fill="#202124"/>
+
+    <!-- the document -->
+    <rect x="30" y="20" width="80" height="100" rx="9" fill="#FFFFFF" opacity="0.10"/>
+    <rect x="30" y="20" width="80" height="100" rx="9" fill="none" stroke="#FFFFFF" stroke-opacity="0.30" stroke-width="2"/>
+
+    <!-- body text -->
+    <g fill="#FFFFFF" fill-opacity="0.34">
+      <rect x="44" y="36" width="52" height="5" rx="2.5"/>
+      <rect x="44" y="49" width="52" height="5" rx="2.5"/>
+      <rect x="44" y="85" width="52" height="5" rx="2.5"/>
+      <rect x="44" y="98" width="30" height="5" rx="2.5"/>
+    </g>
+
+    <!-- the retrieved passage, and the frame that says it was cited -->
+    <rect x="44" y="63" width="52" height="5" rx="2.5" fill="#4285F4"/>
+    <rect x="38" y="56" width="64" height="19" rx="5" fill="none" stroke="#FBBC04" stroke-width="2.4"/>
+  </g>
+
+  <g font-family="Google Sans, Inter, ui-sans-serif, -apple-system, Segoe UI, Helvetica, Arial, sans-serif">
+    <text x="258" y="70" font-size="13" font-weight="600" letter-spacing="2.4" fill="#4285F4">CORPUS-ONLY RAG ON VERTEX AI</text>
+
+    <text x="256" y="142" font-size="62" font-weight="600" letter-spacing="-2" fill="#202124">Gemini RAG Automator</text>
+
+    <!-- Google four-colour rule -->
+    <g>
+      <rect x="258" y="160" width="18" height="4" rx="2" fill="#4285F4"/>
+      <rect x="280" y="160" width="18" height="4" rx="2" fill="#EA4335"/>
+      <rect x="302" y="160" width="18" height="4" rx="2" fill="#FBBC04"/>
+      <rect x="324" y="160" width="18" height="4" rx="2" fill="#34A853"/>
+    </g>
+
+    <text x="257" y="203" font-size="22" fill="#5F6368">Drop a PDF in a bucket. It becomes a corpus your agent</text>
+    <text x="257" y="233" font-size="22" fill="#5F6368">can only answer from — or it abstains.</text>
+
+    <text x="257" y="270" font-size="14" letter-spacing="0.3" fill="#80868B">Terraform · Cloud Functions · Vertex AI RAG Engine · Google ADK · Agent Engine</text>
+  </g>
+</svg>
