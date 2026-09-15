@@ -41,6 +41,19 @@ def _require_env(name: str) -> str:
     return value
 
 
+def _pin(package: str, fallback: str, extras: str = "") -> str:
+    """Pin ``package`` to the version installed locally (the pickling env).
+
+    Falls back to ``package{extras}{fallback}`` if the version can't be read.
+    """
+    from importlib.metadata import PackageNotFoundError, version
+
+    try:
+        return f"{package}{extras}=={version(package)}"
+    except PackageNotFoundError:
+        return f"{package}{extras}{fallback}"
+
+
 def _fetch_corpus_resource_name(project_id: str, secret_id: str) -> str:
     client = secretmanager.SecretManagerServiceClient()
     name = f"projects/{project_id}/secrets/{secret_id}/versions/latest"
@@ -127,11 +140,24 @@ def main() -> None:
         "AGENT_TOP_K": os.environ.get("AGENT_TOP_K", "10"),
         "AGENT_DISTANCE_THRESHOLD": os.environ.get("AGENT_DISTANCE_THRESHOLD", "0.6"),
         "AGENT_STRUCTURED_OUTPUT": os.environ.get("AGENT_STRUCTURED_OUTPUT", "0"),
+        "AGENT_EXCERPT_MAX_CHARS": os.environ.get("AGENT_EXCERPT_MAX_CHARS", "600"),
     }
 
+    # Pin google-adk and google-cloud-aiplatform to the EXACT versions installed
+    # in this (the pickling) environment. Agent Engine serialises the agent here
+    # with the local google-adk, but the container does a fresh `pip install` of
+    # the requirements below. With unpinned `>=` constraints the container can
+    # pull a newer google-adk than the one that created the pickle; the agent
+    # then unpickles into a broken object and `stream_query` silently yields
+    # nothing (HTTP 200, empty body). Pinning keeps container == pickler.
+    adk_pin = _pin("google-adk", ">=1.31.0")
+    aiplatform_pin = _pin(
+        "google-cloud-aiplatform", ">=1.135.0", extras="[adk,agent-engines]"
+    )
+    logger.info(f"[+] Pinning {adk_pin} and {aiplatform_pin} to match this env.")
     requirements = [
-        "google-adk>=1.31.0",
-        "google-cloud-aiplatform[adk,agent-engines]>=1.135.0",
+        adk_pin,
+        aiplatform_pin,
         "python-dotenv>=1.0.0",
     ]
 

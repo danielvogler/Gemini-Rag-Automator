@@ -1,8 +1,12 @@
 """Query the deployed corpus-only ADK agent (or a local one) and render citations.
 
 Reads ``AGENT_ENGINE_ID`` from ``.env`` and calls ``stream_query`` against the
-deployed agent. Extracts the function_response from the retrieve tool to
-render citations alongside the model's final answer.
+deployed agent. The agent now appends a "Source excerpts:" section to its own
+answer (see ``src/agent/rendering.py``), so for plain output this script just
+prints what the agent returned. ``--structured`` rebuilds a JSON envelope from
+the retrieve tool's function_response (with the answer stripped of the excerpt
+block). A fallback re-renders excerpts client-side if the deployed agent
+predates the server-side change.
 
 Usage:
     python scripts/query_agent.py "What is X?"
@@ -15,6 +19,7 @@ import argparse
 import json
 import logging
 import os
+import re
 import sys
 from pathlib import Path
 from typing import Any
@@ -74,18 +79,42 @@ def _extract_text(event: dict[str, Any]) -> str:
 
 
 _EXCERPT_MAX_CHARS = 600
+# Must match rendering.EXCERPTS_HEADER in the agent. Used to detect/strip the
+# excerpts the deployed agent now appends itself, so the CLI neither
+# double-renders them (plain) nor leaks them into the JSON answer (structured).
+_EXCERPTS_HEADER = "Source excerpts:"
+
+
+_CITATION_PATTERN = re.compile(r"\[(\d+)\]")
+
+
+def _strip_excerpts(answer: str) -> str:
+    """Return just the model's answer, dropping any agent-appended excerpts."""
+    marker = f"\n\n{_EXCERPTS_HEADER}"
+    idx = answer.find(marker)
+    return answer[:idx].rstrip() if idx != -1 else answer
+
+
+def _cited_indices(answer: str) -> set[int]:
+    return {int(m) for m in _CITATION_PATTERN.findall(answer)}
 
 
 def _render_plain(answer: str, chunks: list[dict]) -> str:
     if not chunks:
         return answer
-    lines = [answer, "", "Source excerpts:"]
-    for c in chunks:
+    cited = _cited_indices(answer)
+    shown = [c for c in chunks if c.get("index") in cited] if cited else chunks
+    if not shown:
+        shown = chunks
+    lines = [answer, "", _EXCERPTS_HEADER]
+    for c in shown:
         idx = c.get("index")
         title = c.get("source_display_name") or c.get("source_uri") or "(unknown)"
         uri = c.get("source_uri") or ""
         score = c.get("score")
-        score_str = f" score={score:.3f}" if isinstance(score, (int, float)) else ""
+        score_str = (
+            f" vector_distance={score:.3f}" if isinstance(score, (int, float)) else ""
+        )
         text = (c.get("text") or "").strip()
         if len(text) > _EXCERPT_MAX_CHARS:
             text = text[:_EXCERPT_MAX_CHARS].rstrip() + "..."
@@ -174,8 +203,15 @@ def main() -> None:
     answer = "".join(answer_fragments).strip()
 
     if args.structured:
-        print(_render_structured(answer, final_chunks))
+        # Build JSON from the captured chunks; strip any excerpt block the agent
+        # appended so it doesn't end up duplicated inside the "answer" field.
+        print(_render_structured(_strip_excerpts(answer), final_chunks))
+    elif _EXCERPTS_HEADER in answer or not final_chunks:
+        # The deployed agent already rendered excerpts (or there are none) —
+        # print its output verbatim.
+        print(answer)
     else:
+        # Fallback for an agent deployed before excerpts moved server-side.
         print(_render_plain(answer, final_chunks))
 
 
